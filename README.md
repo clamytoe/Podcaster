@@ -1,10 +1,27 @@
-Podcaster
---
-Program to keep track of your favorite podcasts. Simply add the RSS feed into the it and get most of the details that you could ever want about each episode.
+# Podcaster
+> Helps keep track of your listening progress of your favorite podcasts. Simply add the RSS feed into it and be able to get any details of the podcast and its available episodes, with the option of being able to download specific episodes or a random one.
 
-I'm using Python 3.6.1 *f-string* formatting and `wget` to download the episodes. Not sure if it'll work on a Windows machine with cygwin or perhaps on a newer Windows 10 machine with the Ubuntu shell.
+I'm using Python 3.6.1 *f-string* formatting and `wget` to download the episodes. Not sure if it'll work on a Windows machine with cygwin or perhaps on a newer Windows 10 machine with the Ubuntu shell. If you use that setup, please let me know.
+
+## Installation
+Simple clone or download the repo and run the following command from within the extracted directory:
+
+`python3 -m pip install .`
+
+After installation the program can be ran as follows:
+
+`podcaster [OPTIONS] COMMAND [ARGS]...`
+
+If you don't want to install it, you can simply run it by calling the `main.py` script. I would recommend that you create a virtual environment for it as follows:
+
+    cd Podcaster
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    python main.py
+
 ## How to use
-If you run the script with no command line arguments, you'll get the help message.
+My examples will assume that the program was not installed. If you did install it, simple replace `python main.py` with `podcaster`. If you run the script with no command line arguments, you'll get the help message.
 
 ![help](img/help.png)
 
