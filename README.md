@@ -1,5 +1,5 @@
 # Podcaster
-> Helps keep track of your listening progress of your favorite podcasts. Simply add the RSS feed into it and be able to get any details of the podcast and its available episodes, with the option of being able to download specific episodes or a random one.
+> Keeps track of your favorite podcasts listening progress. Simply add the RSS feed into it and be able to get any details of the podcast and its available episodes, with the option of being able to download specific episodes or any random one.
 
 I'm using Python 3.6.1 *f-string* formatting and `wget` to download the episodes. Not sure if it'll work on a Windows machine with cygwin or perhaps on a newer Windows 10 machine with the Ubuntu shell. If you use that setup, please let me know.
 
