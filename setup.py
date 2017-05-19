@@ -8,7 +8,7 @@ setup(
         'main',
         'podcaster.podcaster',
         'podcaster.models',
-        'podcaster.utils.utils.py',
+        'podcaster.utils.utils',
     ],
     install_requires=[
         'click',
