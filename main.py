@@ -19,36 +19,31 @@ def main():
     pass
 
 
-@main.command()
-@click.option('--pod1', is_flag=True, default=False, help='Preload with first entry')
-@click.option('--pod2', is_flag=True, default=False, help='Preload with second entry')
-@click.option('--pod3', is_flag=True, default=False, help='Preload with third entry')
-@click.option('--all', is_flag=True, default=False, help='Preload with all entries')
-def preload(all, pod1, pod2, pod3):
-    """Preload the database with defaults"""
-    if pod1:
-        click.echo(f'Adding {FEEDS[0]}')
-        pod = Podcast(FEEDS[0])
-    elif pod2:
-        click.echo(f'Adding {FEEDS[1]}')
-        pod = Podcast(FEEDS[1])
-    elif pod3:
-        click.echo(f'Adding {FEEDS[2]}')
-        pod = Podcast(FEEDS[2])
-    elif all:
-        click.echo(f'Adding them all, please be patient!')
-        for feed in FEEDS:
-            pod = Podcast(feed)
-    else:
-        click.echo('You must enter one of the following choices:')
-        click.secho(f'  --pod1', fg='green', bold=True, nl=False)
-        click.echo(f' for {FEEDS[0]}')
-        click.secho(f'  --pod2', fg='green', bold=True, nl=False)
-        click.echo(f' for {FEEDS[1]}')
-        click.secho(f'  --pod3', fg='green', bold=True, nl=False)
-        click.echo(f' for {FEEDS[2]}')
-        click.secho(f'  --all', fg='green', bold=True, nl=False)
-        click.echo(' for all of them!')
+def check_eid(pid, eid):
+    """Check to see if the show id is valid"""
+    episode_ids = []
+    for pod in PODS:
+        if pod.id == pid:
+            selected = Podcast(pod.rss)
+            episodes = selected.episodes
+            for episode in episodes:
+                episode_ids.append(episode.id)
+    return True if eid in episode_ids else False
+
+
+def check_pid(pid):
+    """Checks to see if the podcast id that was requested is valid"""
+    pod_ids = []
+    for pod in PODS:
+        pod_ids.append(pod.id)
+    return True if pid in pod_ids else False
+
+
+def empty_message():
+    click.secho('There are no podcasts in the database!'.upper(), fg='red', bold=True)
+    click.secho('Check the help message for further details: ', nl=False)
+    click.secho(' --help ', fg='cyan', bold=True)
+    exit(0)
 
 
 @main.command()
@@ -64,7 +59,6 @@ def feed(url):
 @click.argument('podcast_id', type=click.INT)
 def episodes(podcast_id, eid, download):
     """Displays the episodes that are in the podcast"""
-    click.clear()
 
     if check_pid(podcast_id):
         for pod in PODS:
@@ -77,7 +71,6 @@ def episodes(podcast_id, eid, download):
                                 if download:
                                     selected.download_episode(show)
                                     selected.mark_episode_done(show)
-                                    exit(0)
                                 else:
                                     click.secho(f'Episode ID: {show.id} ', fg='yellow', bg='blue', bold=True, nl=False)
                                     click.secho('\t\t\t', nl=False)
@@ -98,7 +91,6 @@ def episodes(podcast_id, eid, download):
 @click.option('--pid', '-p', type=click.INT, help='ID of the pod to display')
 def podcasts(pid):
     """Displays information about the podcasts"""
-    click.clear()
 
     if PODS:
         if pid:
@@ -137,9 +129,40 @@ def podcasts(pid):
 
 
 @main.command()
+@click.option('--pod1', is_flag=True, default=False, help='Preload with first entry')
+@click.option('--pod2', is_flag=True, default=False, help='Preload with second entry')
+@click.option('--pod3', is_flag=True, default=False, help='Preload with third entry')
+@click.option('--all', is_flag=True, default=False, help='Preload with all entries')
+def preload(all, pod1, pod2, pod3):
+    """Preload the database with defaults"""
+    if pod1:
+        click.echo(f'Adding {FEEDS[0]}')
+        pod = Podcast(FEEDS[0])
+    elif pod2:
+        click.echo(f'Adding {FEEDS[1]}')
+        pod = Podcast(FEEDS[1])
+    elif pod3:
+        click.echo(f'Adding {FEEDS[2]}')
+        pod = Podcast(FEEDS[2])
+    elif all:
+        click.echo(f'Adding them all, please be patient!')
+        for feed in FEEDS:
+            pod = Podcast(feed)
+    else:
+        click.echo('You must enter one of the following choices:')
+        click.secho(f'  --pod1', fg='green', bold=True, nl=False)
+        click.echo(f' for {FEEDS[0]}')
+        click.secho(f'  --pod2', fg='green', bold=True, nl=False)
+        click.echo(f' for {FEEDS[1]}')
+        click.secho(f'  --pod3', fg='green', bold=True, nl=False)
+        click.echo(f' for {FEEDS[2]}')
+        click.secho(f'  --all', fg='green', bold=True, nl=False)
+        click.echo(' for all of them!')
+
+
+@main.command()
 def random():
     """Randomly selects and downloads an episode"""
-    click.clear()
     if PODS:
         pod = choice(PODS)
         podcast = Podcast(pod.rss)
@@ -147,36 +170,8 @@ def random():
             episode = podcast.get_random_episode()
             podcast.download_episode(episode)
             podcast.mark_episode_done(episode)
-            exit(0)
     else:
         empty_message()
-
-
-def check_eid(pid, eid):
-    """Check to see if the show id is valid"""
-    episode_ids = []
-    for pod in PODS:
-        if pod.id == pid:
-            selected = Podcast(pod.rss)
-            episodes = selected.episodes
-            for episode in episodes:
-                episode_ids.append(episode.id)
-    return True if eid in episode_ids else False
-
-
-def check_pid(pid):
-    """Checks to see if the podcast id that was requested is valid"""
-    pod_ids = []
-    for pod in PODS:
-        pod_ids.append(pod.id)
-    return True if pid in pod_ids else False
-
-
-def empty_message():
-    click.secho('There are no podcasts in the database!'.upper(), fg='red', bold=True)
-    click.secho('Check the help message for further details: ', nl=False)
-    click.secho(' --help ', fg='cyan', bold=True)
-    exit(0)
 
 
 if __name__ == '__main__':

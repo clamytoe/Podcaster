@@ -2,6 +2,7 @@ import os
 import time
 
 from datetime import datetime
+from re import sub
 
 
 def check_dir(dir):
@@ -12,6 +13,13 @@ def check_dir(dir):
 
     if not os.path.exists(dir_path):
         os.mkdir(dir_path)
+
+def clean_up(block_text):
+    """Takes the given block of text and cleans it up"""
+    clean = sub('\w(\s{2,})\w', '', block_text)
+    clean = sub(' +', ' ', clean)
+    clean = sub('\n+ ', '\n', clean)
+    return clean
 
 
 def format_link(link):

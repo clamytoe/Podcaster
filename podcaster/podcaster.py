@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 
 from podcaster.models import Base, Episode, Pod
-from podcaster.utils.utils import check_dir, format_date, format_duration, format_link
+from podcaster.utils.utils import check_dir, clean_up, format_date, format_duration, format_link
 
 USER_HOME = os.path.expanduser('~')
 PODCASTER_DIR = os.path.join(USER_HOME, '.podcaster')
@@ -92,14 +92,14 @@ class Podcast(object):
             if response.status == 200:
                 self.title = response.feed.title
                 raw_sub = response.feed.subtitle
-                subtitle = self._clean_up(raw_sub)
+                subtitle = clean_up(raw_sub)
                 self.subtitle = subtitle
                 self.link = response.feed.link
                 self.author = response.feed.author_detail.name
                 self.email = response.feed.author_detail.email
                 self.image = response.feed.image.href
                 raw_sum = response.feed.summary
-                summary = self._clean_up(raw_sum)
+                summary = clean_up(raw_sum)
                 self.summary = summary
                 self.published = format_date(response.feed.published_parsed)
                 shows = response.entries
@@ -138,14 +138,6 @@ class Podcast(object):
             logger.debug('Attempted to update dummy podcast object')
             click.echo('You can not update the dummy object')
 
-    @staticmethod
-    def _clean_up(block_text):
-        """Takes the given block of text and cleans it up"""
-        clean = sub('\w(\s{2,})\w', '', block_text)
-        clean = sub(' +', ' ', clean)
-        clean = sub('\n+ ', '\n', clean)
-        return clean
-
     def _update_from_db(self, podcast):
         """Update podcast information from existing entries in the database"""
         logger.debug('Retriving values from the databse')
@@ -169,8 +161,8 @@ class Podcast(object):
         """Add new podcast to the database"""
         logger.debug(f'Adding new podcast from {self.rss}')
         published = self.published
-        subtitle = self._clean_up(self.subtitle)
-        summary = self._clean_up(self.summary)
+        subtitle = clean_up(self.subtitle)
+        summary = clean_up(self.summary)
         pod = Pod(title=self.title, subtitle=subtitle, link=self.link, rss=self.rss, author=self.author,
                   email=self.email, image=self.image, summary=summary, published=published)
         self.session.add(pod)
@@ -202,15 +194,49 @@ class Podcast(object):
 
         self.session.commit()
 
-    def list_episodes(self):
-        """Displays all of the episodes for the podcast"""
-        print('Valid episodes:')
-        for episode in self.episodes:
-            played = 'Played' if episode.done else '      '
-            click.secho(f' {played} ', fg='green', bg='black', nl=False)
-            click.secho(f'[{episode.id:02d}]', fg='magenta', bg='black', nl=False)
-            click.secho(': ', fg='green', bg='black', nl=False)
-            click.secho(f'{episode.title}', fg='white', bg='black', nl=True)
+    def add_new_episodes_to_db(self, shows):
+        """Add a new episode to the database"""
+        logger.debug(f'Adding {len(shows)} to the database')
+
+        with click.progressbar(shows, label="Adding episodes to database") as bar:
+            for episode in bar:
+                # remove extra parameters from file link if they exist
+                file_link = format_link(episode.links[1].href)
+                duration_time = format_duration(episode.itunes_duration)
+                published = format_date(episode.published_parsed)
+
+                show = Episode(pod_id=self.id, title=episode.title, file=file_link, duration=duration_time,
+                               published=published, summary=sub('<.*?>', '', episode.summary))
+                self.session.add(show)
+                self.session.commit()
+                logger.debug(f'Added: [{show.id}] {show.title}')
+
+        self._update_status()
+
+    @staticmethod
+    def download_episode(episode):
+        """Download an episode"""
+        check_dir(EPISODES_DIR)
+        link = episode.file
+        mp3 = link.split('/')[-1]
+        mp3_path = os.path.join(EPISODES_DIR, mp3)
+        cmd = f'wget --no-verbose --show-progress -c {link} -O {mp3_path}'
+
+        # I tried doing this withing Python, but couldn't get a progress bar working
+        os.system(cmd)
+
+    @staticmethod
+    def email_episode(episode):
+        """Email the selected episode"""
+        # TODO: Setup email handler
+        # could use os.environ to retrieve credentials
+        logger.debug(f'Attempting to mail episode {episode}')
+        click.secho('Emailing episodes is not implemented yet', fg='red', bold=True)
+
+    def get_all_podcasts(self):
+        """Returns all available podcasts in the database"""
+        podcasts = self.session.query(Pod).all()
+        return podcasts
 
     def get_episode(self, episode_id):
         """Grabs an episode from the database"""
@@ -240,24 +266,12 @@ class Podcast(object):
 
         return episodes
 
-    def add_new_episodes_to_db(self, shows):
-        """Add a new episode to the database"""
-        logger.debug(f'Adding {len(shows)} to the database')
-
-        with click.progressbar(shows, label="Adding episodes to database") as bar:
-            for episode in bar:
-                # remove extra parameters from file link if they exist
-                file_link = format_link(episode.links[1].href)
-                duration_time = format_duration(episode.itunes_duration)
-                published = format_date(episode.published_parsed)
-
-                show = Episode(pod_id=self.id, title=episode.title, file=file_link, duration=duration_time,
-                               published=published, summary=sub('<.*?>', '', episode.summary))
-                self.session.add(show)
-                self.session.commit()
-                logger.debug(f'Added: [{show.id}] {show.title}')
-
-        self._update_status()
+    def get_podcast(self, pod_id):
+        """Retrieves the specified podcast from the database"""
+        pod = self.session.query(Pod).filter(Pod.id == pod_id).one()
+        podcast = Podcast(pod.rss)
+        podcast.update()
+        return podcast
 
     def get_random_episode(self, pod_id=None):
         """Retrieves a random show from the database"""
@@ -276,44 +290,22 @@ class Podcast(object):
                 print('You have already played all of the episodes!')
                 return None
 
+    def list_episodes(self):
+        """Displays all of the episodes for the podcast"""
+        print('Valid episodes:')
+        for episode in self.episodes:
+            played = 'Played' if episode.done else '      '
+            click.secho(f' {played} ', fg='green', bg='black', nl=False)
+            click.secho(f'[{episode.id:02d}]', fg='magenta', bg='black', nl=False)
+            click.secho(': ', fg='green', bg='black', nl=False)
+            click.secho(f'{episode.title}', fg='white', bg='black', nl=True)
+
     def mark_episode_done(self, episode):
         """Update an episode as done in the database"""
         logger.debug(f'Marking episode {episode.id} as completed')
         self.session.query(Episode).filter(Episode.id == episode.id).update({'done': True})
         self.session.commit()
         self._update_status()
-
-    def get_all_podcasts(self):
-        """Returns all available podcasts in the database"""
-        podcasts = self.session.query(Pod).all()
-        return podcasts
-
-    def get_podcast(self, pod_id):
-        """Retrieves the specified podcast from the database"""
-        pod = self.session.query(Pod).filter(Pod.id == pod_id).one()
-        podcast = Podcast(pod.rss)
-        podcast.update()
-        return podcast
-
-    @staticmethod
-    def download_episode(episode):
-        """Download an episode"""
-        check_dir(EPISODES_DIR)
-        link = episode.file
-        mp3 = link.split('/')[-1]
-        mp3_path = os.path.join(EPISODES_DIR, mp3)
-        cmd = f'wget --no-verbose --show-progress -c {link} -O {mp3_path}'
-
-        # I tried doing this withing Python, but couldn't get a progress bar working
-        os.system(cmd)
-
-    @staticmethod
-    def email_episode(episode):
-        """Email the selected episode"""
-        # TODO: Setup email handler
-        # could use os.environ to retrieve credentials
-        logger.debug(f'Attempting to mail episode {episode}')
-        click.secho('Emailing episodes is not implemented yet', fg='red', bold=True)
 
     def __repr__(self):
         return f'<Podcast (id={self.id}, title={self.title}, updated={self.published}, episodes={len(self.episodes)},' \
